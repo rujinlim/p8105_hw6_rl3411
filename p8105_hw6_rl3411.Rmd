@@ -1,0 +1,11 @@
+---
+title: "p8105_hw6_rl3411"
+author: "rl3411"
+date: "2023-11-17"
+output: html_document
+---
+
+```{r}
+library(tidyverse)
+```
+

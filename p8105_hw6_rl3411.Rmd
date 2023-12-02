@@ -85,6 +85,8 @@ model_results |>
 
 # Problem 2
 
+Let's first load the weather data.
+
 ```{r}
 weather_df = 
   rnoaa::meteo_pull_monitors(
@@ -99,7 +101,7 @@ weather_df =
   select(name, id, everything())
 ```
 
-
+Now, we create a function that generates a bootstrap sample of the model, and creates a tibble containing the $R^2$ value as well as a $\log(\beta_1*\beta_2)$ value. Because the values for $\beta$ contains negative values, these will produce NaNs when we take the log.
 
 ```{r}
 boot_sample = function(df){
@@ -122,7 +124,11 @@ boot_sample = function(df){
   
   tibble(r2, lgb1b2)
 }
+```
 
+We then use this function to create 5000 bootstrap samples for producing estimates of those two quantities.
+
+```{r}
 boot_straps = 
   tibble(strap_number = 1:5000) |> 
   mutate(
@@ -130,6 +136,7 @@ boot_straps =
   unnest(strap_sample)
 ```
 
+Let's now look at the distribution of these estimates. The distribution of $R^2$ is slightly left skewed, with an average of around 0.92. However, the distribution of $\log(\beta_1*\beta_2)$ looks very left skewed, with an average of around -6. 
 
 ```{r}
 boot_straps |> 
@@ -151,6 +158,8 @@ boot_straps |>
     y = "Frequency"
   ) 
 ```
+
+Using the 5000 bootstrap estimates, we can identify the 95% confidence interval for $R^2$ and $log(\beta_1∗\beta_2)$ using the `quantile()` function.
 
 ```{r}
 boot_straps |> 

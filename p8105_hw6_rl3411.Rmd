@@ -7,5 +7,191 @@ output: github_document
 
 ```{r}
 library(tidyverse)
+library(modelr)
+library(MASS)
 ```
+
+# Problem 1
+
+
+
+# Problem 2
+
+```{r}
+weather_df = 
+  rnoaa::meteo_pull_monitors(
+    c("USW00094728"),
+    var = c("PRCP", "TMIN", "TMAX"), 
+    date_min = "2022-01-01",
+    date_max = "2022-12-31") |>
+  mutate(
+    name = recode(id, USW00094728 = "CentralPark_NY"),
+    tmin = tmin / 10,
+    tmax = tmax / 10) |>
+  select(name, id, everything())
+```
+```{r}
+boot_sample = function(df){
+  
+  boot_samp = sample_frac(df, replace = TRUE) 
+  model = lm(tmax ~ tmin + prcp, data = boot_samp)
+  
+  r2 =  model |> 
+    broom::glance() |> 
+    select(r.squared)
+  
+  lgb1b2 = model |> 
+    broom::tidy() |> 
+    filter(term %in% c("tmin", "prcp")) |>
+    select(term, estimate) |> 
+    pivot_wider(names_from = term,
+                values_from = estimate) |> 
+    mutate(logb1b2 = log(tmin * prcp)) |> 
+    select(logb1b2)
+  
+  tibble(r2, lgb1b2)
+}
+
+boot_straps = 
+  tibble(strap_number = 1:5000) |> 
+  mutate(
+    strap_sample = map(strap_number, \(i) boot_sample(df = weather_df))) |> 
+  unnest(strap_sample)
+```
+
+
+```{r}
+boot_straps |> 
+  ggplot(aes(x = r.squared)) +
+  geom_histogram(fill = "#0077BE") + 
+  labs(
+    title = "Distribution of R-squared from Bootstrap samples",
+    x = "R-squared",
+    y = "Frequency"
+  )
+
+boot_straps |> 
+  drop_na(logb1b2) |> 
+  ggplot(aes(x = logb1b2)) +
+  geom_histogram(fill = "#0077BE") + 
+  labs(
+    title = "Distribution of log(beta1 * beta2) from Bootstrap samples",
+    x = "Log(beta1 * beta2)",
+    y = "Frequency"
+  ) 
+```
+
+```{r}
+boot_straps |> 
+  pivot_longer(
+    r.squared:logb1b2,
+    names_to = "variable",
+    values_to = "estimate"
+  ) |> 
+  group_by(parameter) |> 
+  summarize(
+    lower_CI = quantile(estimate, 0.025, na.rm = TRUE),
+    upper_CI = quantile(estimate, 0.975, na.rm = TRUE)
+  ) |> 
+  knitr::kable()
+```
+
+# Problem 3
+
+```{r}
+bw_df = read_csv("birthweight.csv") |> 
+  mutate(
+    babysex = as.factor(case_match(
+      babysex,
+      1 ~ "male",
+      2 ~ "female")),
+    frace = as.factor(case_match(
+      frace,
+      1 ~ "white", 
+      2 ~ "black", 
+      3 ~ "asian", 
+      4 ~ "puerto rican", 
+      8 ~ "other", 
+      9 ~ "unknown")),
+    mrace = as.factor(case_match(
+      mrace,
+      1 ~ "white", 
+      2 ~ "black", 
+      3 ~ "asian", 
+      4 ~ "puerto rican", 
+      8 ~ "other")),
+    malform = as.factor(case_match(
+      malform,
+      0 ~ "absent", 
+      1 ~ "present")))
+```
+
+```{r}
+full_model = lm(bwt ~ ., data = bw_df)
+step_model = stepAIC(full_model, direction = "both", trace = F)
+summary(step_model)
+
+step_model |> 
+  broom::tidy() |> 
+  knitr::kable(digits = 3)
+
+step_model |> 
+  broom::glance() |> 
+  knitr::kable(digits = 3)
+```
+
+```{r}
+bw_df |> 
+  add_residuals(step_model) |> 
+  add_predictions(step_model) |> 
+  ggplot(aes(x = pred, y = resid)) + 
+  geom_point() +
+  geom_smooth() +
+  labs(title = "Model residuals vs. fitted values",
+       x = "Predicted values",
+       y = "Residuals")
+```
+
+```{r}
+model2 = lm(bwt ~ blength + gaweeks, data = bw_df)
+model3 = lm(bwt ~ bhead*blength*babysex, data = bw_df)
+
+bw_df |> 
+  crossv_mc(n = 1000)
+
+cv_df = 
+  bw_df |>
+  crossv_mc(100) |> 
+  mutate(
+    train = map(train, as_tibble),
+    test = map(test, as_tibble),
+    stepwise_model = map(train, \(df) step_model),
+    main_eff_model = map(train, \(df) model2),
+    eff_mod_model = map(train, \(df) model3)
+  ) |> 
+  mutate(
+    rmse_stepwise = map2_dbl(stepwise_model, test, \(mod, df) rmse(model = mod, data = df)),
+    rmse_main = map2_dbl(main_eff_model, test, \(mod, df) rmse(model = mod, data = df)),
+    rmse_eff_mod = map2_dbl(eff_mod_model, test,\(mod, df) rmse(model = mod, data = df))
+  )
+  
+cv_df |> 
+  select(starts_with("rmse")) |> 
+  pivot_longer(
+    everything(),
+    names_to = "model", 
+    values_to = "rmse",
+    names_prefix = "rmse_") |> 
+  mutate(model = fct_inorder(model)) |> 
+  ggplot(aes(x = model, y = rmse)) + geom_violin()
+```
+
+
+
+
+
+
+
+
+
 

@@ -178,6 +178,8 @@ boot_straps |>
 
 # Problem 3
 
+Firstly, let's load and clean the data. When cleaning, we change the variables `babysex`, `frace`, `mrace` and `malform` to factors. There is no missing data in this dataset.
+
 ```{r}
 bw_df = read_csv("birthweight.csv") |> 
   mutate(
@@ -206,19 +208,30 @@ bw_df = read_csv("birthweight.csv") |>
       1 ~ "present")))
 ```
 
+To build a model, let's use the `stepAIC()` function in the `MASS` package to carry out model building with a stepwise regression approach as learned in the P8130 class, following the guidelines [here](http://www.sthda.com/english/articles/37-model-selection-essentials-in-r/154-stepwise-regression-essentials-in-r/#:~:text=The%20stepwise%20regression%20(or%20stepwise,model%20that%20lowers%20prediction%20error.). 
+
 ```{r}
 full_model = lm(bwt ~ ., data = bw_df)
 step_model = MASS::stepAIC(full_model, direction = "both", trace = F)
-summary(step_model)
+```
 
+We can look at the estimates of the variables here.
+
+```{r}
 step_model |> 
   broom::tidy() |> 
   knitr::kable(digits = 3)
+```
 
+And we can look at how fell the model fits here. A $R^2$ value of 0.718 indicates a pretty decent fit. 
+
+```{r}
 step_model |> 
   broom::glance() |> 
   knitr::kable(digits = 3)
 ```
+
+To look at how well this model fits, let's show a plot of model residuals against fitted values. We can see that for extremely low predicted values of birth weight, the model fails to perform as well but for the large cluster of points, the model fit is reasonable.
 
 ```{r}
 bw_df |> 
@@ -232,10 +245,16 @@ bw_df |>
        y = "Residuals")
 ```
 
+Let's now build two more models to compare with. One using length at birth and gestational age as predictors and one using head circumference, length, sex, and all interactions between these.
+
 ```{r}
 model2 = lm(bwt ~ blength + gaweeks, data = bw_df)
 model3 = lm(bwt ~ bhead*blength*babysex, data = bw_df)
+```
 
+Let's now conduct cross-validation of 1000 samples and see how the models compare by looking at the RMSE.
+
+```{r}
 cv_df = 
   bw_df |>
   crossv_mc(1000) |> 
@@ -265,8 +284,7 @@ cv_df |>
   labs(title = "Comparison between plots")
 ```
 
-
-
+Looking at this violin plot, we can see that the stepwise model has the lowest RMSE, followed by the model with interaction terms of `bhead`, `blength`, and `babysex`, followed by the simplest model with only `blength` and `gaweeks`. Here, the model with interaction terms will probably be best, since it only uses three variables from the dataset and is simple to interpret, and has a much lower RMSE than the `main` model. Although the stepwise model is better than the `eff_mod` model, it takes many more predictors and does not show as much improvement.
 
 
 

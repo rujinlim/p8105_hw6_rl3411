@@ -208,7 +208,7 @@ bw_df = read_csv("birthweight.csv") |>
       1 ~ "present")))
 ```
 
-To build a model, let's use the `stepAIC()` function in the `MASS` package to carry out model building with a stepwise regression approach as learned in the P8130 class, following the guidelines [here](http://www.sthda.com/english/articles/37-model-selection-essentials-in-r/154-stepwise-regression-essentials-in-r/#:~:text=The%20stepwise%20regression%20(or%20stepwise,model%20that%20lowers%20prediction%20error.). 
+To build a model, let's use the `stepAIC()` function in the `MASS` package to carry out model building with a stepwise regression approach as learned in the P8130 class, following the guidelines [here](http://www.sthda.com/english/articles/37-model-selection-essentials-in-r/154-stepwise-regression-essentials-in-r/#). 
 
 ```{r}
 full_model = lm(bwt ~ ., data = bw_df)

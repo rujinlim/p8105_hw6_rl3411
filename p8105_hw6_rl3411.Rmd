@@ -8,7 +8,6 @@ output: github_document
 ```{r}
 library(tidyverse)
 library(modelr)
-library(MASS)
 ```
 
 # Problem 1
@@ -30,6 +29,9 @@ weather_df =
     tmax = tmax / 10) |>
   select(name, id, everything())
 ```
+
+
+
 ```{r}
 boot_sample = function(df){
   
@@ -88,110 +90,11 @@ boot_straps |>
     names_to = "variable",
     values_to = "estimate"
   ) |> 
-  group_by(parameter) |> 
+  group_by(variable) |> 
   summarize(
     lower_CI = quantile(estimate, 0.025, na.rm = TRUE),
     upper_CI = quantile(estimate, 0.975, na.rm = TRUE)
   ) |> 
   knitr::kable()
 ```
-
-# Problem 3
-
-```{r}
-bw_df = read_csv("birthweight.csv") |> 
-  mutate(
-    babysex = as.factor(case_match(
-      babysex,
-      1 ~ "male",
-      2 ~ "female")),
-    frace = as.factor(case_match(
-      frace,
-      1 ~ "white", 
-      2 ~ "black", 
-      3 ~ "asian", 
-      4 ~ "puerto rican", 
-      8 ~ "other", 
-      9 ~ "unknown")),
-    mrace = as.factor(case_match(
-      mrace,
-      1 ~ "white", 
-      2 ~ "black", 
-      3 ~ "asian", 
-      4 ~ "puerto rican", 
-      8 ~ "other")),
-    malform = as.factor(case_match(
-      malform,
-      0 ~ "absent", 
-      1 ~ "present")))
-```
-
-```{r}
-full_model = lm(bwt ~ ., data = bw_df)
-step_model = stepAIC(full_model, direction = "both", trace = F)
-summary(step_model)
-
-step_model |> 
-  broom::tidy() |> 
-  knitr::kable(digits = 3)
-
-step_model |> 
-  broom::glance() |> 
-  knitr::kable(digits = 3)
-```
-
-```{r}
-bw_df |> 
-  add_residuals(step_model) |> 
-  add_predictions(step_model) |> 
-  ggplot(aes(x = pred, y = resid)) + 
-  geom_point() +
-  geom_smooth() +
-  labs(title = "Model residuals vs. fitted values",
-       x = "Predicted values",
-       y = "Residuals")
-```
-
-```{r}
-model2 = lm(bwt ~ blength + gaweeks, data = bw_df)
-model3 = lm(bwt ~ bhead*blength*babysex, data = bw_df)
-
-bw_df |> 
-  crossv_mc(n = 1000)
-
-cv_df = 
-  bw_df |>
-  crossv_mc(100) |> 
-  mutate(
-    train = map(train, as_tibble),
-    test = map(test, as_tibble),
-    stepwise_model = map(train, \(df) step_model),
-    main_eff_model = map(train, \(df) model2),
-    eff_mod_model = map(train, \(df) model3)
-  ) |> 
-  mutate(
-    rmse_stepwise = map2_dbl(stepwise_model, test, \(mod, df) rmse(model = mod, data = df)),
-    rmse_main = map2_dbl(main_eff_model, test, \(mod, df) rmse(model = mod, data = df)),
-    rmse_eff_mod = map2_dbl(eff_mod_model, test,\(mod, df) rmse(model = mod, data = df))
-  )
-  
-cv_df |> 
-  select(starts_with("rmse")) |> 
-  pivot_longer(
-    everything(),
-    names_to = "model", 
-    values_to = "rmse",
-    names_prefix = "rmse_") |> 
-  mutate(model = fct_inorder(model)) |> 
-  ggplot(aes(x = model, y = rmse)) + geom_violin()
-```
-
-
-
-
-
-
-
-
-
 
